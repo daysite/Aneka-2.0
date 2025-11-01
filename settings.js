@@ -44,7 +44,7 @@ global.channel = "https://chat.whatsapp.com/JydqOKu1AA399bMJOluzY2?mode=wwt"
 global.github = "https://chat.whatsapp.com/JydqOKu1AA399bMJOluzY2?mode=wwt"
 global.gmail = "Danieldevelop@gmail.com"
 global.ch = {
-ch1: "120363401404146384@newsletter"
+ch1: "120363401360971612@newsletter"
 }
 
 //*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
