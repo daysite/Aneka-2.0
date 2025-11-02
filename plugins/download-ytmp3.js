@@ -1,168 +1,65 @@
-/* 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗯𝘆 𝗦𝗵𝗮𝗱𝗼𝘄'𝘀 𝗖𝗹𝘂𝗯 🌺᭄
-𝖢𝗋𝖾𝖺𝖽𝗈 𝗉𝗈𝗋 𝖣𝖾𝗏.𝖢𝗋𝗂𝗌𝗌 🇦🇱
-https://whatsapp.com/channel/0029VauTE8AHltY1muYir31n*/
+import fetch from "node-fetch"
 
-import axios from 'axios';
-import crypto from 'crypto';
+let handler = async (m, { conn, args }) => {
+  if (!args[0]) return m.reply(`🌟 Ingresa un link de YouTube\n\n📌 Ejemplo: .ytmp3 https://youtu.be/xxxxx`)
 
-const savetube = {
-  api: {
-    base: "https://media.savetube.me/api",
-    cdn: "/random-cdn",
-    info: "/v2/info",
-    download: "/download"
-  },
-  headers: {
-    'accept': '*/*',
-    'content-type': 'application/json',
-    'origin': 'https://yt.savetube.me',
-    'referer': 'https://yt.savetube.me/',
-    'user-agent': 'Postify/1.0.0'
-  },
-  formats: ['mp3'],
-
-  crypto: {
-    hexToBuffer: (hexString) => Buffer.from(hexString.match(/.{1,2}/g).join(''), 'hex'),
-
-    decrypt: async (enc) => {
-      const secretKey = 'C5D58EF67A7584E4A29F6C35BBC4EB12';
-      const data = Buffer.from(enc, 'base64');
-      const iv = data.slice(0, 16);
-      const content = data.slice(16);
-      const key = savetube.crypto.hexToBuffer(secretKey);
-      const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
-      const decrypted = Buffer.concat([decipher.update(content), decipher.final()]);
-      return JSON.parse(decrypted.toString());
-    }
-  },
-
-  isUrl: str => {
-    try {
-      new URL(str);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  },
-
-  youtube: url => {
-    const patterns = [
-      /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
-      /youtu\.be\/([a-zA-Z0-9_-]{11})/
-    ];
-    for (let regex of patterns) {
-      if (regex.test(url)) return url.match(regex)[1];
-    }
-    return null;
-  },
-
-  request: async (endpoint, data = {}, method = 'post') => {
-    try {
-      const { data: response } = await axios({
-        method,
-        url: `${endpoint.startsWith('http') ? '' : savetube.api.base}${endpoint}`,
-        data: method === 'post' ? data : undefined,
-        params: method === 'get' ? data : undefined,
-        headers: savetube.headers
-      });
-      return { status: true, code: 200, data: response };
-    } catch (error) {
-      return {
-        status: false,
-        code: error.response?.status || 500,
-        error: error.message
-      };
-    }
-  },
-
-  getCDN: async () => {
-    const res = await savetube.request(savetube.api.cdn, {}, 'get');
-    return res.status ? { status: true, code: 200, data: res.data.cdn } : res;
-  },
-
-  download: async (link) => {
-    if (!link) return { status: false, code: 400, error: "Falta el enlace de YouTube." };
-    if (!savetube.isUrl(link)) return { status: false, code: 400, error: "URL inválida de YouTube." };
-
-    const id = savetube.youtube(link);
-    if (!id) return { status: false, code: 400, error: "*No se pudo extraer el ID del video.*" };
-
-    try {
-      const cdnRes = await savetube.getCDN();
-      if (!cdnRes.status) return cdnRes;
-      const cdn = cdnRes.data;
-
-      const infoRes = await savetube.request(`https://${cdn}${savetube.api.info}`, {
-        url: `https://www.youtube.com/watch?v=${id}`
-      });
-      if (!infoRes.status || !infoRes.data?.data)
-        return { status: false, code: 500, error: 'Error al obtener o procesar datos del video.' };
-
-      const decrypted = await savetube.crypto.decrypt(infoRes.data.data);
-
-      const dl = await savetube.request(`https://${cdn}${savetube.api.download}`, {
-        id,
-        downloadType: 'audio',
-        quality: '128',
-        key: decrypted.key
-      });
-
-      return {
-        status: true,
-        code: 200,
-        result: {
-          title: decrypted.title || "Desconocido",
-          type: 'audio',
-          format: 'mp3',
-          thumbnail: decrypted.thumbnail || `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
-          download: dl.data.data.downloadUrl,
-          id,
-          key: decrypted.key,
-          duration: decrypted.duration,
-          quality: '128'
-        }
-      };
-
-    } catch (error) {
-      return { status: false, code: 500, error: error.message };
-    }
-  }
-};
-
-const handler = async (m, { conn, args }) => {
-  if (!args[0]) return m.reply(`*${xdownload} Por favor, ingresa una URL de un video o audio de YouTube*`);
-
-  const url = args[0];
-  if (!savetube.isUrl(url)) return m.reply("*⚠️ Ingresa un link válido de YouTube.*");
+  const urlVideo = args[0].trim()
 
   try {
-    await m.react('🕒');
-    const res = await savetube.download(url);
+    await conn.sendMessage(m.chat, { react: { text: "⏳", key: m.key } })
 
-    if (!res.status) {
-      await m.react('✖️');
-      return m.reply(`*✖️ Error:* ${res.error}`);
+    let res, fromBackup = false
+
+    try {
+      res = await fetch(`https://api.zenkey.my.id/api/download/ytmp3?apikey=zenkey&url=${encodeURIComponent(urlVideo)}`)
+      if (!res.ok) throw new Error("Error en API principal")
+      console.log("» Usando API principal (Zenkey)")
+    } catch {
+      console.warn("» Error con API principal, intentando respaldo...")
+      res = await fetch(`https://apiadonix.kozow.com/download/ytmp3?apikey=${global.apikey}&url=${encodeURIComponent(urlVideo)}`)
+      if (!res.ok) throw new Error("Error en API de respaldo")
+      console.log("» Usando API de respaldo (Adonix)")
+      fromBackup = true
     }
 
-    const { title, download } = res.result;
-    await conn.sendMessage(m.chat, {
-      audio: { url: download },
-      mimetype: 'audio/mpeg',
-      fileName: `${title}.mp3`
-    }, { quoted: m });
+    const data = await res.json()
+    console.log("📦 Respuesta completa del API:", JSON.stringify(data, null, 2))
 
-    await m.react('✅');
+    const downloadUrl = fromBackup
+      ? data.url
+      : (
+        data.result?.download_url ??
+        data.download_url ??
+        data.url ??
+        data.result?.url ??
+        data.result?.link ??
+        data.result?.audio ??
+        null
+      )
+
+    if (!downloadUrl) return m.reply("❌ No se pudo obtener el audio de la respuesta.")
+
+    const fileResp = await fetch(downloadUrl)
+    const buffer = Buffer.from(await fileResp.arrayBuffer())
+
+    await conn.sendMessage(
+      m.chat,
+      {
+        audio: buffer,
+        mimetype: "audio/mpeg",
+        fileName: `audio.mp3`
+      },
+      { quoted: m }
+    )
+
   } catch (e) {
-    await m.react('✖️');
-    m.reply(`*⚠️ La descarga ha fallado, posible errores en la API o la descarga es muy pesada.*`);
+    console.error("❌ Error en ytmp3 handler:", e)
+    m.reply("❌ Error al descargar el audio. Intenta con otro link.")
   }
-};
+}
 
-handler.help = ['ytmp3'];
-handler.command = ['ytmp3'];
-handler.tags = ['download'];
+handler.command = ['ytmp3']
+handler.help = ["ytmp3 <link>"]
+handler.tags = ["descargas"]
 
-export default handler;
+export default handler
